@@ -131,6 +131,14 @@
                                 </select>
                             </div>
                             <div class="col-sm">
+                                <select :disabled="!isIdle()" class="custom-select" v-model="streaming.forcedVideoCodec">
+                                    <option disabled>Forced codec</option>
+                                    <option value="" selected>Auto</option>
+                                    <option value="H264">H264</option>
+                                    <option value="VP8">VP8</option>
+                                </select>
+                            </div>
+                            <div class="col-sm">
                                 <!--            <select :disabled="!isIdle()" class="custom-select" v-model="streaming.resolution">-->
                                 <!--              <option disabled selected>Target resolution</option>-->
                                 <!--              <option value="1">640x480</option>-->
@@ -223,6 +231,7 @@
                             nack: 0,
                             drop: 0,
                         },
+                        forcedVideoCodec: '',
                         videoSource: null
                     },
 
@@ -378,7 +387,9 @@
                                     {
                                         maximum: this.streaming.bitrate,
                                         startup: this.streaming.bitrate * 0.7
-                                    });
+                                    },
+                                    this.streaming.forcedVideoCodec
+                                    );
 
                                 // WebSocket streamer report every second
                                 // const telemetry = new Telemetry('wss://address/metrics');

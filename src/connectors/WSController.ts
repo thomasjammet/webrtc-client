@@ -66,14 +66,14 @@ export class WSController extends SIPConnector implements IController {
      * By default, a listener channel is negotiated.
      * To create a streamer channel, pass a stream parameter.
      */
-    constructor(connectParams: Connect.Params, stream?: MediaStream) {
+    constructor(connectParams: Connect.Params, stream?: MediaStream, forcedVideoCodec?: string) {
         super(connectParams, stream);
         this._ws = new WebSocketReliable(Connect.buildURL(Connect.Type.WEBRTC, connectParams, 'wss'));
         this._ws.onClose = (error?: WebSocketReliableError) => this.close(error);
         this._ws.onOpen = () => {
             this._startReportWatchdog();
             // [ENG-142] Add a way to get the server's configuration for 'iceServers'
-            this._open(connectParams.iceServer);
+            this._open(connectParams.iceServer, forcedVideoCodec);
         };
         this._ws.onMessage = (message: string) => {
             try {

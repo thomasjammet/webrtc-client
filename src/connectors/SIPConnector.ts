@@ -20,8 +20,11 @@ const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
  * @param sdp the original sdp
  * @returns the sdp with stereo=1 for the opus codecs
  */
-function setStereoForOpus(sdp: string): string {
+function updateSdp(sdp: string, forcedVideoCodec?: string): string {
     const sdpObj = sdpTransform.parse(sdp);
+    if (forcedVideoCodec) {
+        console.log('Forcing video codec to', forcedVideoCodec);
+    }
     for (const media of sdpObj.media) {
         if (media.type === 'audio') {
             const opusPayloads = [];
@@ -45,6 +48,32 @@ function setStereoForOpus(sdp: string): string {
                     }
                 }
             }
+        } else if (media.type === 'video' && forcedVideoCodec) {
+            // Force video codec by removing all other rtp in the media
+            const nbRtp = media.rtp.length;
+            let indexRtp = 0;
+            const payloadsToRemove: number[] = [];
+            for (let i = 0; i < nbRtp; i++) {
+                if (media.rtp[indexRtp].codec.toLowerCase() !== forcedVideoCodec.toLowerCase()) {
+                    console.debug('remove rtp', media.rtp[indexRtp]);
+                    payloadsToRemove.push(media.rtp[indexRtp].payload);
+                    media.rtp.splice(indexRtp, 1);
+                } else {
+                    console.debug('keep rtp', media.rtp[indexRtp]);
+                    indexRtp++;
+                }
+            }
+            // Remove the corresponding fmtp and rtcpFb
+            media.fmtp = media.fmtp.filter(fmtp => !payloadsToRemove.includes(fmtp.payload));
+            if (media.rtcpFb) {
+                media.rtcpFb = media.rtcpFb.filter(rtcpFb => !payloadsToRemove.includes(rtcpFb.payload));
+            }
+            if (media.rtcpFbTrrInt) {
+                media.rtcpFbTrrInt = media.rtcpFbTrrInt.filter(
+                    rtcpFbTrrInt => !payloadsToRemove.includes(rtcpFbTrrInt.payload)
+                );
+            }
+            media.payloads = media.rtp.map(r => r.payload).join(' ');
         }
     }
     return sdpTransform.write(sdpObj);
@@ -238,7 +267,7 @@ export abstract class SIPConnector extends EventEmitter implements IConnector {
      * Main function which creates the RTCPeerConnection, creates the offer,
      * calls the _sip method, then set the answer and calls onOpen
      */
-    protected _open(iceServer?: RTCIceServer) {
+    protected _open(iceServer?: RTCIceServer, forcedVideoCodec?: string) {
         // If iceServer is not provided, use the default one
         if (!iceServer) {
             const domain = new NetAddress(this._endPoint, 443).domain;
@@ -315,7 +344,7 @@ export abstract class SIPConnector extends EventEmitter implements IConnector {
                 if (!this._peerConnection) {
                     return;
                 }
-                offer.sdp = sdp = offer.sdp ? setStereoForOpus(offer.sdp as string) : '';
+                offer.sdp = sdp = offer.sdp ? updateSdp(offer.sdp as string, forcedVideoCodec) : '';
 
                 this.log(`Offer\r\n${sdp}`).debug();
                 return this._peerConnection.setLocalDescription(offer);

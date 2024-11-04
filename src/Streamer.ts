@@ -190,7 +190,11 @@ export class Streamer extends EventEmitter {
      * This doesn't start the broadcast, you must call start() method
      * @param Connector Connector class to use for signaling, can be determined automatically from URL in the start() method
      */
-    constructor(private Connector?: { new (connectParams: Connect.Params, stream: MediaStream): IConnector }) {
+    constructor(
+        private Connector?: {
+            new (connectParams: Connect.Params, stream: MediaStream, forcedVideoCodec?: string): IConnector;
+        }
+    ) {
         super();
         this._videoBitrate = 0;
         this._videoBitrateConstraint = 0;
@@ -236,7 +240,12 @@ export class Streamer extends EventEmitter {
      * @param params Connection parameters
      * @param adaptiveBitrate Adaptive bitrate implementation or ABRParams to configure the default implementation
      */
-    start(stream: MediaStream, params: Connect.Params, adaptiveBitrate: ABRAbstract | ABRParams | undefined = {}) {
+    start(
+        stream: MediaStream,
+        params: Connect.Params,
+        adaptiveBitrate: ABRAbstract | ABRParams | undefined = {},
+        forcedVideoCodec?: string
+    ) {
         this.stop();
 
         // Connector
@@ -244,7 +253,8 @@ export class Streamer extends EventEmitter {
         this._videoBitrateFixed = false;
         this._connector = new (this.Connector || (params.endPoint.startsWith('http') ? HTTPConnector : WSController))(
             params,
-            stream
+            stream,
+            forcedVideoCodec
         );
 
         this._connector.log = this.log.bind(this, 'Signaling:') as ILog;
